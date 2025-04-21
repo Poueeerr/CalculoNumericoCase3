@@ -2,56 +2,63 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # --------------------------
-# Funções auxiliares (avaliação e derivadas manuais)
+# Funções auxiliares manuais
 # --------------------------
 
-def gerar_funcao_quartica(seed=None):
-    if seed is not None:
-        np.random.seed(seed)
-    return np.random.uniform(
-        low=[-5e-6, -1e-4, 1e-4, -1e-3, -1e-3],
-        high=[ 5e-6,  1e-4, 5e-3,  1e-3,  1e-3]
-    )
-
+# Avaliação de um polinômio de grau n
 def avaliar_polinomio(coef, x):
-    return sum(c * x**p for c, p in zip(coef, range(len(coef)-1, -1, -1)))
+    return sum(c * x**(len(coef)-1-i) for i, c in enumerate(coef))
 
+# Derivada primeira manual de um polinômio
 def derivada1(coef, x):
     grau = len(coef) - 1
     return sum((grau - i) * c * x**(grau - i - 1) for i, c in enumerate(coef[:-1]))
 
+# Derivada segunda manual de um polinômio
 def derivada2(coef, x):
     grau = len(coef) - 1
-    return sum((grau - i)*(grau - i - 1)*c * x**(grau - i - 2)
-               for i, c in enumerate(coef[:-2]))
+    return sum((grau - i)*(grau - i - 1)*c * x**(grau - i - 2) for i, c in enumerate(coef[:-2]))
+
+# Método de mínimos quadrados manual (sem np.polyfit)
+def ajuste_polinomio(x, y, grau):
+    # Monta a matriz dos sistemas lineares para resolver os coeficientes
+    A = np.vander(x, grau + 1)
+    coef = np.linalg.solve(A.T @ A, A.T @ y)
+    return coef
 
 # --------------------------
 # Dados simulados
 # --------------------------
 
-coef_real = gerar_funcao_quartica(seed=42)
+# Gerar coeficientes reais para uma função quartica
+coef_real = np.random.uniform(low=[-5e-6, -1e-4, 1e-4, -1e-3, -1e-3],
+                              high=[ 5e-6,  1e-4, 5e-3,  1e-3,  1e-3])
+
 x = np.linspace(0, 10, 20)
-y_real = avaliar_polinomio(coef_real, x)
+y_real = np.array([avaliar_polinomio(coef_real, xi) for xi in x])
 
 # Curvas para análise
 x_fino = np.linspace(0, 10, 500)
 curv_real = derivada2(coef_real, x_fino)
+
+# Ajustes para diferentes graus
+graus = [3, 4]
 curvaturas = {}
 erros = {}
 
-# --------------------------
-# Ajustes para diferentes graus
-# --------------------------
-
-graus = [3, 4, 5]
-
 for grau in graus:
-    coef_fit = np.polyfit(x, y_real, grau)
-    y_fit = avaliar_polinomio(coef_fit, x)
+    # Ajuste manual de polinômio
+    coef_fit = ajuste_polinomio(x, y_real, grau)
+    
+    # Calcula os valores ajustados
+    y_fit = np.array([avaliar_polinomio(coef_fit, xi) for xi in x])
+    
+    # Erro absoluto
     erro = y_real - y_fit
     erro_rel = np.abs(erro) / (np.abs(y_real) + 1e-12)
 
-    curv_fit = derivada2(coef_fit, x_fino)
+    # Curvatura (segunda derivada) para análise
+    curv_fit = np.array([derivada2(coef_fit, xi) for xi in x_fino])
     max_curv = np.max(np.abs(curv_fit))
     x_max = x_fino[np.argmax(np.abs(curv_fit))]
 
@@ -79,29 +86,38 @@ for grau in graus:
 # Visualização
 # --------------------------
 
-plt.figure(figsize=(14, 6))
+plt.figure(figsize=(18, 5))  # Aumenta a largura para 3 gráficos lado a lado
 
-# Plot da curvatura real e ajustadas
-plt.subplot(1, 2, 1)
-plt.plot(x_fino, curv_real, label="Curvatura Real (grau 4)", linewidth=2)
+# 1. Deflexão simulada e ajuste
+plt.subplot(1, 3, 1)
+plt.plot(x, y_real, 'o', label='Medições simuladas', color='orange')
+for grau in graus:
+    y_fit = np.array([avaliar_polinomio(erros[grau]["coef"], xi) for xi in x])
+    plt.plot(x, y_fit, label=f"Polinômio Ajustado (grau {grau})")
+plt.title("Deflexão simulada e polinômio ajustado")
+plt.xlabel("x (m)")
+plt.ylabel("y (m)")
+plt.grid(True)
+plt.legend()
+
+# 2. Curvatura ao longo da viga
+plt.subplot(1, 3, 2)
 for grau in graus:
     curv, max_c, x_c = curvaturas[grau]
-    plt.plot(x_fino, curv, '--', label=f"Ajuste grau {grau}")
-    plt.axvline(x_c, linestyle=':', alpha=0.5)
-
-plt.title("Comparação das Curvaturas")
+    plt.plot(x_fino, curv, label=f"Curvatura grau {grau}")
+    plt.axvline(x_c, linestyle='--', alpha=0.7, label=f"Máx. em x = {x_c:.2f}")
+plt.title("Curvatura aproximada ao longo da viga")
 plt.xlabel("x (m)")
 plt.ylabel("Curvatura (1/m)")
 plt.grid(True)
 plt.legend()
 
-# Plot de erro absoluto
-plt.subplot(1, 2, 2)
+# 3. Erro absoluto
+plt.subplot(1, 3, 3)
 for grau in graus:
-    y_fit = avaliar_polinomio(erros[grau]["coef"], x)
+    y_fit = np.array([avaliar_polinomio(erros[grau]["coef"], xi) for xi in x])
     erro_abs = np.abs(y_real - y_fit)
     plt.plot(x, erro_abs, 'o--', label=f"Erro grau {grau}")
-
 plt.title("Erro absoluto nas medições")
 plt.xlabel("x (m)")
 plt.ylabel("|y_real - y_fit|")
