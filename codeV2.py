@@ -19,10 +19,15 @@ def derivada2(coef, x):
     grau = len(coef) - 1
     return sum((grau - i)*(grau - i - 1)*c * x**(grau - i - 2) for i, c in enumerate(coef[:-2]))
 
+# Matriz de Vandermonde
+def vander(coef, cols=0):
+    if not cols:
+        cols = len(coef)
+    return np.array([[c**(j-1) for j in range(cols, 0, -1)] for c in coef])
+
 # Método de mínimos quadrados manual (sem np.polyfit)
 def ajuste_polinomio(x, y, grau):
-    # Monta a matriz dos sistemas lineares para resolver os coeficientes
-    A = np.vander(x, grau + 1)
+    A = vander(x, grau + 1)
     coef = np.linalg.solve(A.T @ A, A.T @ y)
     return coef
 
@@ -39,7 +44,6 @@ y_real = np.array([avaliar_polinomio(coef_real, xi) for xi in x])
 
 # Curvas para análise
 x_fino = np.linspace(0, 10, 500)
-curv_real = derivada2(coef_real, x_fino)
 
 # Ajustes para diferentes graus
 graus = [3, 4]
@@ -49,20 +53,20 @@ erros = {}
 for grau in graus:
     # Ajuste manual de polinômio
     coef_fit = ajuste_polinomio(x, y_real, grau)
-    
+
     # Calcula os valores ajustados
     y_fit = np.array([avaliar_polinomio(coef_fit, xi) for xi in x])
-    
+
     # Erro absoluto
     erro = y_real - y_fit
     erro_rel = np.abs(erro) / (np.abs(y_real) + 1e-12)
 
-    # Curvatura (segunda derivada) para análise
-    curv_fit = np.array([derivada2(coef_fit, xi) for xi in x_fino])
-    max_curv = np.max(np.abs(curv_fit))
-    x_max = x_fino[np.argmax(np.abs(curv_fit))]
+    # Curvatura (segunda derivada) para análise usando o x_fino
+    curvatura = np.array([derivada2(coef_fit, xi) for xi in x_fino])
+    curv_max = np.max(np.abs(curvatura))
+    x_curv_max = x_fino[np.argmax(np.abs(curvatura))]
 
-    curvaturas[grau] = (curv_fit, max_curv, x_max)
+    curvaturas[grau] = (curvatura, curv_max, x_curv_max)
     erros[grau] = {
         "coef": coef_fit,
         "erro_max": np.max(np.abs(erro)),
